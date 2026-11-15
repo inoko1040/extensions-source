@@ -40,7 +40,7 @@ abstract class KissLove : KeiSource() {
         val url = baseUrl.toHttpUrl().newBuilder()
             .addPathSegments("api/manga")
             .addQueryParameter("page", page.toString())
-            .addQueryParameter("limit", "36")
+            .addQueryParameter("limit", PAGE_SIZE)
             .build()
 
         val response = client.get(url, sigAppend(), Fetch.XHR)
@@ -52,15 +52,18 @@ abstract class KissLove : KeiSource() {
     }
 
     override suspend fun getSearchMangaList(page: Int, query: String, filters: FilterList): MangasPage {
+        val sort = filters.firstInstanceOrNull<SortFilter>()?.state ?: Filter.Sort.Selection(0, false)
+        // TachiComi: "trending" is the site's 10 daily trending titles, without search or filters.
+        if (sort.index == TRENDING) return getTrending()
+
         val url = baseUrl.toHttpUrl().newBuilder().apply {
             addPathSegments("api/manga/list")
             addQueryParameter("search", query)
             // TachiComi: the site sorts by popularity, last update or title, either way.
-            val sort = filters.firstInstanceOrNull<SortFilter>()?.state ?: Filter.Sort.Selection(0, false)
             addQueryParameter("sort", SORTS.getOrElse(sort.index) { SORTS[0] })
             addQueryParameter("order", if (sort.ascending) "asc" else "desc")
             addQueryParameter("page", page.toString())
-            addQueryParameter("limit", "36")
+            addQueryParameter("limit", PAGE_SIZE)
 
             filters.forEach { filter ->
                 when (filter) {
@@ -70,6 +73,9 @@ abstract class KissLove : KeiSource() {
                     }
 
                     is StatusFilter -> addQueryParameter("status", filter.toUriPart())
+
+                    // TachiComi: the site matches romaji or Japanese names (ODA Eiichiro, 尾田栄一郎).
+                    is AuthorFilter -> filter.state.trim().takeIf { it.isNotEmpty() }?.let { addQueryParameter("author", it) }
 
                     else -> {}
                 }
@@ -82,6 +88,15 @@ abstract class KissLove : KeiSource() {
         val hasNextPage = result.currentPage < result.totalPages
 
         return MangasPage(mangas, hasNextPage)
+    }
+
+    private suspend fun getTrending(): MangasPage {
+        val url = baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/manga/trending-daily")
+            .build()
+
+        val response = client.get(url, sigAppend(), Fetch.XHR)
+        return MangasPage(response.parseAs<List<Manga>>().map { it.toSManga() }, false)
     }
 
     override suspend fun fetchMangaUpdate(
@@ -145,7 +160,8 @@ abstract class KissLove : KeiSource() {
 
     override fun getFilterList(data: JsonElement?): FilterList {
         val filterList = ArrayList<Filter<*>>()
-        filterList.add(SortFilter(intl["sort"], arrayOf(intl["sort_popular"], intl["sort_updated"], intl["sort_title"])))
+        filterList.add(SortFilter(intl["sort"], arrayOf(intl["sort_popular"], intl["sort_updated"], intl["sort_title"], intl["sort_trending"])))
+        filterList.add(AuthorFilter(intl["author"]))
 
         filterList.add(StatusFilter(intl["status"], statusList))
 
@@ -185,6 +201,8 @@ abstract class KissLove : KeiSource() {
         fun toUriPart() = status[state].second
     }
 
+    private class AuthorFilter(name: String) : Filter.Text(name)
+
     private class SortFilter(name: String, values: Array<String>) : Filter.Sort(name, values, Selection(0, false))
 
     private inline fun <reified T> FilterList.firstInstanceOrNull(): T? = firstOrNull { it is T } as? T
@@ -194,8 +212,10 @@ abstract class KissLove : KeiSource() {
     private class CheckBoxFilter(name: String) : Filter.CheckBox(name)
 
     companion object {
-        /** The site's sort keys, in [SortFilter]'s order. */
+        /** The site's sort keys, in [SortFilter]'s order; [TRENDING] comes after them. */
         private val SORTS = listOf("Popular", "Updated", "Title")
+        private const val TRENDING = 3
+        private const val PAGE_SIZE = "60"
 
         private const val CLIENT_ID = "KL9K40zaSyC9K40vOMLLbEcepIFBhUKXwELqxlwTEF"
         private val FILTER_IMG = setOf(

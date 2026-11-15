@@ -42,13 +42,20 @@ class Manga(
     val views: Long,
     @SerialName("vote_count") val voteCount: Long?,
 ) {
+    /** TachiComi: "閲覧 1,960,934 ・ 評価 120 ・ 最終更新 2026-11-01". */
+    private fun stats() = listOfNotNull(
+        "閲覧 %,d".format(views),
+        voteCount?.let { "評価 %,d".format(it) },
+        lastUpdate?.take(10)?.let { "最終更新 $it" },
+    ).joinToString(" ・ ")
+
     fun toSManga() = SManga.create().apply {
         url = this@Manga.slug
         // TachiComi: show the Japanese title when the site lists one.
         title = JapaneseTitle.of(otherName) ?: this@Manga.name
         artist = this@Manga.artists
         author = this@Manga.authors
-        description = "${Jsoup.parse(this@Manga.description).text()}\n\n${this@Manga.name}, $otherName"
+        description = "${Jsoup.parse(this@Manga.description).text()}\n\n${this@Manga.name}, $otherName\n\n${stats()}"
         thumbnail_url = this@Manga.cover
         genre = this@Manga.genres?.split(",")?.joinToString { it.trim() }
         status = if (mStatus == 1) SManga.COMPLETED else SManga.ONGOING
