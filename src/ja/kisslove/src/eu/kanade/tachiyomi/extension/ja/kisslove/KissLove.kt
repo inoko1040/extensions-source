@@ -68,7 +68,7 @@ abstract class KissLove : KeiSource() {
             filters.forEach { filter ->
                 when (filter) {
                     is GenreFilter -> {
-                        val included = filter.state.filter { it.state }.joinToString(",") { it.name }
+                        val included = filter.state.filter { it.state }.joinToString(",") { it.value }
                         addQueryParameter("genre", included)
                     }
 
@@ -166,7 +166,7 @@ abstract class KissLove : KeiSource() {
         filterList.add(StatusFilter(intl["status"], statusList))
 
         val genres = data?.parseAs<List<Genre>>()?.map {
-            CheckBoxFilter(it.name)
+            CheckBoxFilter(JapaneseGenre.of(it.name), it.name)
         }
         if (!genres.isNullOrEmpty()) {
             filterList.add(
@@ -209,7 +209,8 @@ abstract class KissLove : KeiSource() {
 
     private class GenreFilter(name: String, state: List<CheckBoxFilter>) : Filter.Group<CheckBoxFilter>(name, state)
 
-    private class CheckBoxFilter(name: String) : Filter.CheckBox(name)
+    // TachiComi: shown in Japanese, sent to the site as its own name.
+    private class CheckBoxFilter(name: String, val value: String) : Filter.CheckBox(name)
 
     companion object {
         /** The site's sort keys, in [SortFilter]'s order; [TRENDING] comes after them. */

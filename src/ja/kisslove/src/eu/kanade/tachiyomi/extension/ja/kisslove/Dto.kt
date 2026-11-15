@@ -57,7 +57,7 @@ class Manga(
         author = this@Manga.authors
         description = "${Jsoup.parse(this@Manga.description).text()}\n\n${this@Manga.name}, $otherName\n\n${stats()}"
         thumbnail_url = this@Manga.cover
-        genre = this@Manga.genres?.split(",")?.joinToString { it.trim() }
+        genre = this@Manga.genres?.split(",")?.joinToString { JapaneseGenre.of(it) }
         status = if (mStatus == 1) SManga.COMPLETED else SManga.ONGOING
     }
 }
@@ -93,7 +93,7 @@ class MangaEntry(
         author = this@MangaEntry.authors
         description = "${Jsoup.parse(this@MangaEntry.description).text()}\n\n${this@MangaEntry.name}, $otherName"
         thumbnail_url = this@MangaEntry.cover
-        genre = this@MangaEntry.genres?.joinToString { it.trim() }
+        genre = this@MangaEntry.genres?.joinToString { JapaneseGenre.of(it) }
         status = if (mStatus == 1) SManga.COMPLETED else SManga.ONGOING
     }
 }
