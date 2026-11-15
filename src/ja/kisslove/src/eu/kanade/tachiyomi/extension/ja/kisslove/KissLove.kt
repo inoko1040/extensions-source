@@ -31,17 +31,8 @@ abstract class KissLove : KeiSource() {
         this::class.java.classLoader!!,
     )
 
-    override suspend fun getPopularManga(page: Int): MangasPage {
-        val url = baseUrl.toHttpUrl().newBuilder()
-            .addPathSegments("api/manga/trending-daily")
-            .build()
-
-        val response = client.get(url, sigAppend(), Fetch.XHR)
-        val result = response.parseAs<List<Manga>>()
-        val mangas = result.map { it.toSManga() }
-
-        return MangasPage(mangas, false)
-    }
+    // TachiComi: the whole list by popularity, page by page, instead of the 10 daily trending ones.
+    override suspend fun getPopularManga(page: Int): MangasPage = getSearchMangaList(page, "", FilterList())
 
     override fun getMangaUrl(manga: SManga): String = "$baseUrl/${manga.url}.html"
 
@@ -64,9 +55,12 @@ abstract class KissLove : KeiSource() {
         val url = baseUrl.toHttpUrl().newBuilder().apply {
             addPathSegments("api/manga/list")
             addQueryParameter("search", query)
-            addQueryParameter("sort", "Popular")
-            addQueryParameter("order", "desc")
+            // TachiComi: the site sorts by popularity, last update or title, either way.
+            val sort = filters.firstInstanceOrNull<SortFilter>()?.state ?: Filter.Sort.Selection(0, false)
+            addQueryParameter("sort", SORTS.getOrElse(sort.index) { SORTS[0] })
+            addQueryParameter("order", if (sort.ascending) "asc" else "desc")
             addQueryParameter("page", page.toString())
+            addQueryParameter("limit", "36")
 
             filters.forEach { filter ->
                 when (filter) {
@@ -151,6 +145,7 @@ abstract class KissLove : KeiSource() {
 
     override fun getFilterList(data: JsonElement?): FilterList {
         val filterList = ArrayList<Filter<*>>()
+        filterList.add(SortFilter(intl["sort"], arrayOf(intl["sort_popular"], intl["sort_updated"], intl["sort_title"])))
 
         filterList.add(StatusFilter(intl["status"], statusList))
 
@@ -190,11 +185,18 @@ abstract class KissLove : KeiSource() {
         fun toUriPart() = status[state].second
     }
 
+    private class SortFilter(name: String, values: Array<String>) : Filter.Sort(name, values, Selection(0, false))
+
+    private inline fun <reified T> FilterList.firstInstanceOrNull(): T? = firstOrNull { it is T } as? T
+
     private class GenreFilter(name: String, state: List<CheckBoxFilter>) : Filter.Group<CheckBoxFilter>(name, state)
 
     private class CheckBoxFilter(name: String) : Filter.CheckBox(name)
 
     companion object {
+        /** The site's sort keys, in [SortFilter]'s order. */
+        private val SORTS = listOf("Popular", "Updated", "Title")
+
         private const val CLIENT_ID = "KL9K40zaSyC9K40vOMLLbEcepIFBhUKXwELqxlwTEF"
         private val FILTER_IMG = setOf(
             "https://1.bp.blogspot.com/-ZMyVQcnjYyE/W2cRdXQb15I/AAAAAAACDnk/8X1Hm7wmhz4hLvpIzTNBHQnhuKu05Qb0gCHMYCw/s0/LHScan.png",
