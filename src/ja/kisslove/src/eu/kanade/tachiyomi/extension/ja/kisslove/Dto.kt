@@ -44,10 +44,11 @@ class Manga(
 ) {
     fun toSManga() = SManga.create().apply {
         url = this@Manga.slug
-        title = this@Manga.name
+        // TachiComi: show the Japanese title when the site lists one.
+        title = JapaneseTitle.of(otherName) ?: this@Manga.name
         artist = this@Manga.artists
         author = this@Manga.authors
-        description = "${Jsoup.parse(this@Manga.description).text()}\n\n$otherName"
+        description = "${Jsoup.parse(this@Manga.description).text()}\n\n${this@Manga.name}, $otherName"
         thumbnail_url = this@Manga.cover
         genre = this@Manga.genres?.split(",")?.joinToString { it.trim() }
         status = if (mStatus == 1) SManga.COMPLETED else SManga.ONGOING
@@ -79,10 +80,11 @@ class MangaEntry(
 ) {
     fun toSManga() = SManga.create().apply {
         url = this@MangaEntry.slug
-        title = this@MangaEntry.name
+        // TachiComi: show the Japanese title when the site lists one.
+        title = JapaneseTitle.of(otherName) ?: this@MangaEntry.name
         artist = this@MangaEntry.artists
         author = this@MangaEntry.authors
-        description = "${Jsoup.parse(this@MangaEntry.description).text()}\n\n$otherName"
+        description = "${Jsoup.parse(this@MangaEntry.description).text()}\n\n${this@MangaEntry.name}, $otherName"
         thumbnail_url = this@MangaEntry.cover
         genre = this@MangaEntry.genres?.joinToString { it.trim() }
         status = if (mStatus == 1) SManga.COMPLETED else SManga.ONGOING
